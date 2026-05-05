@@ -1,0 +1,31 @@
+{
+  "name": "@job-applicator/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@job-applicator/shared": "*",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.0.0",
+    "axios": "^1.0.0",
+    "zustand": "^4.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "tailwindcss": "^3.0.0",
+    "lucide-react": "latest",
+    "react-hot-toast": "^2.0.0",
+    "react-dropzone": "^14.0.0",
+    "recharts": "^2.0.0",
+    "framer-motion": "^11.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "typescript": "^5.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0"
+  }
+}

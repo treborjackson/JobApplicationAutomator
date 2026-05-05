@@ -1,0 +1,28 @@
+{
+  "name": "@job-applicator/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "build:ios": "eas build --platform ios",
+    "build:android": "eas build --platform android"
+  },
+  "dependencies": {
+    "@job-applicator/shared": "*",
+    "expo": "~51.0.0",
+    "expo-router": "^3.0.0",
+    "expo-document-picker": "latest",
+    "expo-notifications": "latest",
+    "expo-haptics": "latest",
+    "expo-secure-store": "latest",
+    "@react-native-async-storage/async-storage": "latest",
+    "nativewind": "^4.0.0",
+    "react-native-reanimated": "latest",
+    "react-native-gesture-handler": "latest",
+    "axios": "^1.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "zustand": "^4.0.0",
+    "react-native-gifted-chat": "latest"
+  }
+}
