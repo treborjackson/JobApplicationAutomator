@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import auth, resume, jobs
+from backend.routers import auth, resume, jobs, cover_letters
 
 app = FastAPI(title="Job Application Automator API", version="0.1.0")
 
@@ -16,3 +16,4 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(resume.router)
 app.include_router(jobs.router)
+app.include_router(cover_letters.router)
