@@ -1,26 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 import { MessageSquare, Send, Star, ChevronRight, Lightbulb } from 'lucide-react';
 import Button from '../components/Common/Button';
 
 const TYPES = ['behavioral', 'technical', 'system_design', 'hr'];
-
-const mockMessages = [
-  {
-    role: 'assistant',
-    content: "Hi! I'm your AI interview coach. I'll be conducting a behavioral interview for a Senior Frontend Engineer role today.\n\nLet's start with Question 1:\n\n**Tell me about a time you had to deliver a complex feature under a tight deadline. What was the situation, and how did you manage it?**",
-  },
-  {
-    role: 'user',
-    content: "At my last job, we had two weeks to ship a redesigned checkout flow before a major sale event. I broke the work into daily milestones, coordinated daily syncs with design and backend, and flagged scope risks early. We shipped on time with only minor post-launch fixes.",
-    score: 8,
-    feedback: "Strong answer! You clearly used the STAR method and demonstrated ownership and communication skills.",
-    improvement: "Consider adding specific metrics — e.g. 'reduced cart abandonment by 12%' — to make the impact concrete.",
-  },
-  {
-    role: 'assistant',
-    content: "Great answer! You demonstrated clear ownership and proactive communication. Score: **8/10**\n\n**Question 2:**\n\nDescribe a situation where you disagreed with a technical decision made by your team. How did you handle it?",
-  },
-];
 
 function MessageBubble({ msg }) {
   const isUser = msg.role === 'user';
@@ -32,13 +17,17 @@ function MessageBubble({ msg }) {
         }`}>
           {msg.content.replace(/\*\*(.*?)\*\*/g, '$1')}
         </div>
-        {isUser && msg.score !== undefined && (
+        {isUser && msg.score != null && (
           <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs">
             <div className="flex items-center gap-1.5 text-emerald-700 font-semibold mb-1">
               <Star size={12} fill="currentColor" /> Score: {msg.score}/10
             </div>
-            <p className="text-emerald-700 mb-1">{msg.feedback}</p>
-            <p className="text-amber-600 flex items-start gap-1"><Lightbulb size={11} className="mt-0.5 shrink-0" />{msg.improvement}</p>
+            {msg.feedback && <p className="text-emerald-700 mb-1">{msg.feedback}</p>}
+            {msg.improvement && (
+              <p className="text-amber-600 flex items-start gap-1">
+                <Lightbulb size={11} className="mt-0.5 shrink-0" />{msg.improvement}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -47,12 +36,73 @@ function MessageBubble({ msg }) {
 }
 
 export default function InterviewCoach() {
-  const [started, setStarted] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [type, setType] = useState('behavioral');
   const [role, setRole] = useState('Senior Frontend Engineer');
   const [input, setInput] = useState('');
+  const bottomRef = useRef(null);
 
-  if (!started) {
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const startMutation = useMutation({
+    mutationFn: () => axios.post('/interview/session/start', { interview_type: type, role_title: role }).then(r => r.data),
+    onSuccess: (data) => {
+      setSessionId(data.session_id);
+      setMessages([{ role: 'assistant', content: data.opening_message }]);
+    },
+    onError: () => toast.error('Failed to start session'),
+  });
+
+  const answerMutation = useMutation({
+    mutationFn: (answer) => axios.post(`/interview/session/${sessionId}/answer`, { answer }).then(r => r.data),
+    onSuccess: (data) => {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'user',
+          content: data.user_answer,
+          score: data.score,
+          feedback: data.feedback,
+          improvement: data.improvement,
+        },
+        { role: 'assistant', content: data.next_question ?? data.closing_message ?? '' },
+      ]);
+    },
+    onError: () => toast.error('Failed to submit answer'),
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: () => axios.post(`/interview/session/${sessionId}/complete`).then(r => r.data),
+    onSuccess: (data) => {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Session complete!\n\nOverall score: ${data.overall_score}/10\n\n${data.summary ?? ''}`,
+      }]);
+      setSessionId(null);
+    },
+    onError: () => toast.error('Failed to complete session'),
+  });
+
+  const handleSend = () => {
+    const text = input.trim();
+    if (!text || answerMutation.isPending) return;
+    setInput('');
+    answerMutation.mutate(text);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const handleEnd = () => {
+    if (sessionId) completeMutation.mutate();
+    else { setSessionId(null); setMessages([]); }
+  };
+
+  if (!sessionId && messages.length === 0) {
     return (
       <div>
         <div className="flex items-center gap-2 mb-6">
@@ -87,7 +137,7 @@ export default function InterviewCoach() {
                 ))}
               </div>
             </div>
-            <Button onClick={() => setStarted(true)} className="w-full justify-center mt-2">
+            <Button onClick={() => startMutation.mutate()} loading={startMutation.isPending} className="w-full justify-center mt-2">
               Start Interview <ChevronRight size={16} />
             </Button>
           </div>
@@ -105,22 +155,42 @@ export default function InterviewCoach() {
           <span className="text-xs bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full capitalize">{type.replace('_', ' ')}</span>
           <span className="text-xs text-gray-400">— {role}</span>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setStarted(false)}>End Session</Button>
+        <Button variant="secondary" size="sm" onClick={handleEnd} loading={completeMutation.isPending}>
+          End Session
+        </Button>
       </div>
 
       <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 overflow-y-auto p-4">
-        {mockMessages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
+        {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
+        {answerMutation.isPending && (
+          <div className="flex justify-start mb-4">
+            <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3">
+              <div className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <span key={i} className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
       </div>
 
-      <div className="mt-3 flex gap-2">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder="Type your answer..."
-          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <Button className="px-4"><Send size={15} /></Button>
-      </div>
+      {sessionId && (
+        <div className="mt-3 flex gap-2">
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your answer… (Enter to send)"
+            rows={2}
+            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+          />
+          <Button className="px-4 self-end" onClick={handleSend} loading={answerMutation.isPending}>
+            <Send size={15} />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
