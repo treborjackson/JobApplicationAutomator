@@ -6,14 +6,15 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/auth': 'http://localhost:8000',
-      '/resume': 'http://localhost:8000',
-      '/jobs': 'http://localhost:8000',
-      '/cover-letters': 'http://localhost:8000',
-      '/applications': 'http://localhost:8000',
-      '/dashboard': 'http://localhost:8000',
-      '/interview': 'http://localhost:8000',
-      '/study-plan': 'http://localhost:8000',
+      '^/(auth|resume|jobs|cover-letters|applications|dashboard|interview|study-plan)(/.*)?$': {
+        target: 'http://localhost:8000',
+        // Only proxy if the request looks like an API call, not a page navigation
+        bypass(req) {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        },
+      },
     },
   },
 });
