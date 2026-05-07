@@ -1,7 +1,8 @@
 version: "3.9"
+
 services:
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     environment:
       POSTGRES_DB: jobapplicator
       POSTGRES_USER: user
@@ -10,6 +11,19 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d jobapplicator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: ./backend
+    env_file: .env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
 
   backend:
     build: ./backend
@@ -17,16 +31,21 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - ./uploads:/app/uploads
+    restart: unless-stopped
 
   web:
-    build: ./apps/web
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
     ports:
       - "3000:80"
     depends_on:
       - backend
+    restart: unless-stopped
 
 volumes:
   pgdata:
